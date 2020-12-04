@@ -22,6 +22,8 @@ pkg_check_modules(GTKMM gtkmm-3.0)
 
 add_executable(hexsage src/main.cpp
     src/MainWindow.cpp src/MainWindow.h
+    src/Model.cpp src/Model.h
+    src/HexViewWidget.cpp src/HexViewWidget.h
     src/HexsageApplication.cpp src/HexsageApplication.h)
 target_include_directories(hexsage PUBLIC ${GTK3_INCLUDE_DIRS} ${GTKMM_INCLUDE_DIRS})
 target_link_libraries(hexsage ${GTK3_LIBRARIES} ${GTKMM_LIBRARIES})
