@@ -16,10 +16,15 @@ public:
 
   void load(const std::string &path);
 
-  size_t cursorPos() const;
   const std::vector<uint8_t> &data() const;
 
+  size_t cursorPos() const;
   void setCursorPos(size_t pos);
+
+  void moveCursorPos(ssize_t by);
+
+  size_t cursorByte() const;
+  void setCursorByte(size_t byte);
 
   void addOnCursorChangedHandler(void *owner, OnCursorChangeHandler handler);
   void removeOnCursorChangedHandlers(void *owner);
@@ -32,6 +37,8 @@ private:
   void emitDataChanged();
 
   std::vector<uint8_t> _data;
+
+  // The position of the cursor in 4 bit increments (position 4 is the third byte)
   size_t _cursor_pos;
 
   std::vector<std::pair<void *, OnCursorChangeHandler>> _on_cursor_change_handlers;

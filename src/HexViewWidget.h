@@ -34,10 +34,16 @@ public:
 
   virtual bool on_draw(const Cairo::RefPtr<::Cairo::Context> &cr) override;
 
+  virtual bool on_key_press_event(GdkEventKey *event) override;
+
 private:
   ModelPtr _model;
 
+  size_t _view_offset = 0;
+
   Glib::RefPtr<Gdk::Window> _window;
+
+  size_t _bytes_per_line = 0;
 };
 
 } // namespace hexsage

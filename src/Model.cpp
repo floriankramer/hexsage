@@ -31,12 +31,36 @@ void Model::load(const std::string &path) {
   emitCursorChanged();
 }
 
-size_t Model::cursorPos() const { return _cursor_pos; }
 const std::vector<uint8_t> &Model::data() const { return _data; }
 
+size_t Model::cursorPos() const { return _cursor_pos; }
+
 void Model::setCursorPos(size_t pos) {
-  _cursor_pos = pos;
+  if (_data.size() == 0) {
+    _cursor_pos = 0;
+  } else {
+    _cursor_pos = std::min(pos, _data.size() * 2 - 1);
+  }
   emitCursorChanged();
+}
+
+void Model::moveCursorPos(ssize_t by) {
+  if (_data.size() == 0) {
+    _cursor_pos = 0;
+  } else if (by < 0 && size_t(std::abs(by)) > _cursor_pos) {
+    _cursor_pos = 0;
+  } else if (by > 0 && _cursor_pos + by >= _data.size() * 2) {
+    _cursor_pos = _data.size() * 2 - 1;
+  } else {
+    _cursor_pos += by;
+  }
+  emitCursorChanged();
+}
+
+size_t Model::cursorByte() const { return _cursor_pos / 2; }
+
+void Model::setCursorByte(size_t byte) {
+  setCursorPos(byte * 2);
 }
 
 void Model::addOnCursorChangedHandler(void *owner,

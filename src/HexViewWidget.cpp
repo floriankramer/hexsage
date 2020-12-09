@@ -2,6 +2,8 @@
 #include <cstring>
 #include <iostream>
 
+#include <gdk/gdk.h>
+#include <gdkmm/event.h>
 #include <gtkmm.h>
 
 namespace hexsage {
@@ -13,14 +15,56 @@ HexViewWidget::HexViewWidget(ModelPtr model)
     : Glib::ObjectBase("HexViewWidget"), Gtk::Widget(), _model(model) {
   set_has_window();
   set_name("hex-view-widget");
+  set_can_focus();
+  set_focus_on_click();
 
   _model->addOnDataChangedHandler(this, [this]() { queue_draw(); });
   _model->addOnCursorChangedHandler(this, [this]() { queue_draw(); });
+
+  add_events(Gdk::KEY_PRESS_MASK);
 }
 
 HexViewWidget::~HexViewWidget() {
   _model->removeOnCursorChangedHandlers(this);
   _model->removeOnDataChangedHandlers(this);
+}
+
+bool HexViewWidget::on_key_press_event(GdkEventKey *event) {
+  if (event->keyval == GDK_KEY_Right) {
+    if (event->state & GDK_SHIFT_MASK) {
+      _model->moveCursorPos(8);
+    } else {
+      _model->moveCursorPos(1);
+    }
+    return true;
+  } else if (event->keyval == GDK_KEY_Left) {
+    if (event->state & GDK_SHIFT_MASK) {
+      _model->moveCursorPos(-8);
+    } else {
+      _model->moveCursorPos(-1);
+    }
+    return true;
+  } else if (event->keyval == GDK_KEY_Up) {
+    if (event->state & GDK_SHIFT_MASK) {
+      _model->moveCursorPos(-_bytes_per_line * 2 * 10);
+    } else {
+      _model->moveCursorPos(-_bytes_per_line * 2);
+    }
+    return true;
+  } else if (event->keyval == GDK_KEY_Down) {
+    if (event->state & GDK_SHIFT_MASK) {
+      _model->moveCursorPos(_bytes_per_line * 2 * 10);
+    } else {
+      _model->moveCursorPos(_bytes_per_line * 2);
+    }
+    return true;
+  } else if (event->keyval == GDK_KEY_g) {
+    _model->setCursorPos(0);
+  } else if (event->keyval == GDK_KEY_G) {
+    _model->setCursorByte(_model->data().size());
+  }
+
+  return Widget::on_key_press_event(event);
 }
 
 void HexViewWidget::setModel(ModelPtr model) {
@@ -103,10 +147,12 @@ void HexViewWidget::on_unrealize() {
 }
 
 bool HexViewWidget::on_draw(const Cairo::RefPtr<::Cairo::Context> &cr) {
+
+  constexpr size_t GROUPING_SIZE = 4;
   const Gtk::Allocation allocation = get_allocation();
 
   // Fill the background
-  Gdk::Cairo::set_source_rgba(cr, Gdk::RGBA("#363b4e"));
+  Gdk::Cairo::set_source_rgba(cr, Gdk::RGBA("#333"));
   cr->move_to(0, 0);
   cr->line_to(allocation.get_width(), 0);
   cr->line_to(allocation.get_width(), allocation.get_height());
@@ -121,40 +167,76 @@ bool HexViewWidget::on_draw(const Cairo::RefPtr<::Cairo::Context> &cr) {
   Cairo::TextExtents extends;
   cr->get_text_extents("0", extends);
 
-  double width = extends.width;
-  double height = extends.height * 1.5;
+  double character_width = extends.x_advance;
+  double character_height = extends.height * 1.5;
+  // The amount of free space above each character.
+  double character_head_space = extends.height * 0.5;
 
   // three characters per bytes
-  size_t bytes_per_line = allocation.get_width() / (width * 3);
+  _bytes_per_line = allocation.get_width() / (character_width * 3);
+  if (_bytes_per_line == 0) {
+    return true;
+  }
   // one additional space per four bytes
-  bytes_per_line -= (bytes_per_line / 4);
+  _bytes_per_line -= (_bytes_per_line / GROUPING_SIZE);
   // Only show full blocks
-  bytes_per_line = size_t(bytes_per_line / 4) * 4;
-  size_t lines_on_page = allocation.get_height() / height;
+  _bytes_per_line = size_t(_bytes_per_line / GROUPING_SIZE) * GROUPING_SIZE;
+  size_t lines_on_page = allocation.get_height() / character_height;
+  if (lines_on_page == 0) {
+    return true;
+  }
+
+  size_t cursor_byte = _model->cursorByte();
+
+  // Ensure the cursor is visible
+  size_t max_visible_byte = _view_offset + (_bytes_per_line * lines_on_page);
+  if (cursor_byte < _view_offset) {
+    _view_offset = (cursor_byte / _bytes_per_line) * _bytes_per_line;
+  } else if (cursor_byte >= max_visible_byte) {
+    _view_offset = (cursor_byte / _bytes_per_line) * _bytes_per_line;
+    _view_offset -= _bytes_per_line * (lines_on_page - 1);
+  }
+
+  // draw the cursor
+  Gdk::Cairo::set_source_rgba(cr, Gdk::RGBA("#daa"));
+  size_t cursor_pos = _model->cursorPos();
+  size_t cursor_col = (cursor_pos - _view_offset * 2) % (_bytes_per_line * 2);
+  // Add the spaces between bytes and between groups
+  cursor_col += cursor_col / 2 + cursor_col / (GROUPING_SIZE * 2);
+  size_t cursor_row = (cursor_pos - _view_offset * 2) / (_bytes_per_line * 2);
+  cr->move_to(cursor_col * character_width,
+              cursor_row * character_height + character_head_space);
+  cr->line_to((cursor_col + 1) * character_width,
+              cursor_row * character_height + character_head_space);
+  cr->line_to((cursor_col + 1) * character_width,
+              (cursor_row + 1) * character_height);
+  cr->line_to(cursor_col * character_width,
+              (cursor_row + 1) * character_height);
+  cr->fill();
 
   // Draw the data
-  Gdk::Cairo::set_source_rgba(cr, Gdk::RGBA("#c4bbf0"));
-
-  std::string line(allocation.get_width() / width, ' ');
+  Gdk::Cairo::set_source_rgba(cr, Gdk::RGBA("#d5d5d5"));
+  std::string line(allocation.get_width() / character_width, ' ');
   for (size_t line_idx = 0; line_idx < lines_on_page; ++line_idx) {
     // assemble the line
     for (size_t i = 0; i < line.size(); ++i) {
       line[i] = ' ';
     }
-    size_t byte_offset = line_idx * bytes_per_line;
+    size_t byte_offset = _view_offset + line_idx * _bytes_per_line;
     if (byte_offset >= _model->data().size()) {
       break;
     }
-    for (size_t b_idx = 0; b_idx < bytes_per_line; ++b_idx) {
-      if (b_idx >= _model->data().size()) {
+    for (size_t b_idx = 0; b_idx < _bytes_per_line; ++b_idx) {
+      if (b_idx + byte_offset >= _model->data().size()) {
         break;
       }
       uint8_t byte = _model->data()[byte_offset + b_idx];
-      line[b_idx * 3 + 0 + b_idx / 4] = CHAR_LOOKUP[(byte >> 4) & 15];
-      line[b_idx * 3 + 1 + b_idx / 4] = CHAR_LOOKUP[byte & 15];
+      line[b_idx * 3 + 0 + b_idx / GROUPING_SIZE] =
+          CHAR_LOOKUP[(byte >> 4) & 15];
+      line[b_idx * 3 + 1 + b_idx / GROUPING_SIZE] = CHAR_LOOKUP[byte & 15];
     }
 
-    cr->move_to(0, (line_idx + 1) * height);
+    cr->move_to(0, (line_idx + 1) * character_height);
     cr->show_text(line);
   }
 

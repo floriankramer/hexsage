@@ -7,8 +7,7 @@ namespace hexsage {
 
 HexsageApplication::HexsageApplication(int argc, char **argv)
     : Gtk::Application(argc, argv, "hex.sage",
-                       Gio::ApplicationFlags::APPLICATION_HANDLES_OPEN),
-      _model(std::make_shared<Model>()) {}
+                       Gio::ApplicationFlags::APPLICATION_HANDLES_OPEN) {}
 
 HexsageApplication::~HexsageApplication() {}
 
@@ -17,12 +16,18 @@ void HexsageApplication::on_startup() {
   buildMenu();
 }
 
+void HexsageApplication::on_activate() { createMainWindow()->present(); }
+
 void HexsageApplication::on_open(const Gio::Application::type_vec_files &files,
                                  const Glib::ustring &hint) {
-  if (files.size() > 0) {
-    _model->load(files[0]->get_path());
+  for (const Glib::RefPtr<Gio::File> &file : files) {
+    MainWindow *window = createMainWindow();
+    window->model().load(file->get_path());
+    window->present();
   }
 };
+
+void HexsageApplication::on_hide_window(Gtk::Window *window) { delete window; }
 
 void HexsageApplication::buildMenu() {
   set_accel_for_action("win.open", "<Primary>o");
@@ -41,4 +46,12 @@ void HexsageApplication::buildMenu() {
   return;
 }
 
+MainWindow *HexsageApplication::createMainWindow() {
+  auto window = new MainWindow();
+  add_window(*window);
+  // ensure we free the windows memory again
+  window->signal_hide().connect(sigc::bind<Gtk::Window *>(
+      sigc::mem_fun(*this, &HexsageApplication::on_hide_window), window));
+  return window;
+}
 } // namespace hexsage

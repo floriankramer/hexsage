@@ -14,6 +14,9 @@ public:
    MainWindow(ModelPtr model = std::make_shared<Model>());
    virtual ~MainWindow();
 
+   Model &model();
+   const Model &model() const;
+
 private:
    ModelPtr _model;
 

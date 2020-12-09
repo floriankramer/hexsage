@@ -21,6 +21,8 @@ MainWindow::MainWindow(ModelPtr model)
 
   show_all_children();
 
+  set_focus(_hex_view_widget);
+
   add_action("open", [this]() {
     std::cout << "open" << std::endl;
     Gtk::FileChooserDialog dialog("Select the file to open",
@@ -36,6 +38,14 @@ MainWindow::MainWindow(ModelPtr model)
   });
 
   add_action("quit", [this]() { hide(); });
+}
+
+Model &MainWindow::model() {
+  return *_model;
+}
+
+const Model &MainWindow::model() const {
+  return *_model;
 }
 
 MainWindow::~MainWindow() {}

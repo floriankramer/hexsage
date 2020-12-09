@@ -1,7 +1,7 @@
 #pragma once
 
 #include <gtkmm/application.h>
-#include "Model.h"
+#include "MainWindow.h"
 
 namespace hexsage {
 
@@ -15,20 +15,20 @@ public:
     return Glib::RefPtr<HexsageApplication>(new HexsageApplication(args...));
   }
 
-  ModelPtr model() {
-    return _model;
-  }
-
 
 protected:
   void on_startup() override;
 
+  void on_activate() override;
+
   void on_open(const Gio::Application::type_vec_files& files,
     const Glib::ustring& hint) override;
 
-private:
-  void buildMenu();
+  void on_hide_window(Gtk::Window *window);
 
-  ModelPtr _model;
+private:
+  MainWindow *createMainWindow();
+
+  void buildMenu();
 };
 } // namespace hexsage
