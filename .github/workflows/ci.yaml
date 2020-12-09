@@ -1,0 +1,21 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - devel
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Install Dependencies
+      run: sudo apt update && sudo apt install libgtkmm-3.0-dev 
+    - name: Build
+      run:  |
+        mkdir build
+        cd build
+        cmake -DCMAKE_BUILD_TYPE=Release ../
+        cmake -build .
+
